@@ -1,0 +1,110 @@
+resources:
+- name: knuca-subnet
+  type: compute.v1.subnetwork
+  properties:
+    allowSubnetCidrRoutesOverlap: false
+    gatewayAddress: "10.0.0.1"
+    ipCidrRange: "10.0.0.0/9"
+    region: europe-west1
+    network: https://www.googleapis.com/compute/v1/projects/knuca-legacy/global/networks/default
+- type: compute.v1.firewall
+  name: knuca-mysql-firwall-rule
+  properties:
+    network: https://www.googleapis.com/compute/v1/projects/knuca-legacy/global/networks/default
+    sourceRanges:
+    - 10.0.0.0/9
+    allowed:
+    - IPProtocol: tcp
+      ports:
+      - 3306
+    direction: INGRESS
+    priority: 1000
+- name: knuca-database
+  type: compute.v1.instance
+  properties:
+    zone: europe-west1-c
+    machineType: https://www.googleapis.com/compute/v1/projects/knuca-legacy/zones/europe-west1-c/machineTypes/g1-small
+    disks:
+    - deviceName: boot
+      type: PERSISTENT
+      boot: true
+      autoDelete: true
+      initializeParams:
+        sourceImage: https://www.googleapis.com/compute/v1/projects/ubuntu-os-cloud/global/images/family/ubuntu-1604-lts
+    networkInterfaces:
+    - network: https://www.googleapis.com/compute/v1/projects/knuca-legacy/global/networks/default
+      accessConfigs:
+      - name: External NAT
+        type: ONE_TO_ONE_NAT
+      networkIP: 10.0.0.2
+      subnetwork: $(ref.knuca-subnet.selfLink)
+    metadata:
+      items:
+      - key: startup-script
+        value: |
+          #!/bin/bash
+          sudo debconf-set-selections <<< 'mysql-server mysql-server/root_password password root'
+          sudo debconf-set-selections <<< 'mysql-server mysql-server/root_password_again password root'
+          sudo apt-get -y install mysql-server
+          echo "CREATE DATABASE knuca CHARACTER SET utf8 COLLATE utf8_general_ci;" > c.sql
+          echo "GRANT ALL PRIVILEGES ON *.* TO 'root'@'%' IDENTIFIED BY 'root' WITH GRANT OPTION;" > g.sql
+          mysql --user="root" --password="root" < c.sql
+          mysql --user="root" --password="root" < g.sql
+          sudo sed -i 's/bind-address/#bind-address/g' /etc/mysql/mysql.conf.d/mysqld.cnf
+          sudo service mysql restart
+- name: knuca-rest
+  type: compute.v1.instance
+  properties:
+    zone: europe-west1-c
+    machineType: https://www.googleapis.com/compute/v1/projects/knuca-legacy/zones/europe-west1-c/machineTypes/g1-small
+    disks:
+    - deviceName: boot
+      type: PERSISTENT
+      boot: true
+      autoDelete: true
+      initializeParams:
+        sourceImage: https://www.googleapis.com/compute/v1/projects/ubuntu-os-cloud/global/images/family/ubuntu-1604-lts
+    networkInterfaces:
+    - network: https://www.googleapis.com/compute/v1/projects/knuca-legacy/global/networks/default
+      accessConfigs:
+      - name: External NAT
+        type: ONE_TO_ONE_NAT
+      networkIP: 10.0.0.3
+      subnetwork: $(ref.knuca-subnet.selfLink)
+    metadata:
+      items:
+      - key: startup-script
+        value: |
+          #!/bin/bash
+          curl -fsSL https://get.docker.com -o get-docker.sh
+          sh get-docker.sh
+    tags:
+      items:
+        - http-server
+        - https-server
+- name: knuca-telegram
+  type: compute.v1.instance
+  properties:
+    zone: europe-west1-c
+    machineType: https://www.googleapis.com/compute/v1/projects/knuca-legacy/zones/europe-west1-c/machineTypes/f1-micro
+    disks:
+    - deviceName: boot
+      type: PERSISTENT
+      boot: true
+      autoDelete: true
+      initializeParams:
+        sourceImage: https://www.googleapis.com/compute/v1/projects/ubuntu-os-cloud/global/images/family/ubuntu-1604-lts
+    networkInterfaces:
+    - network: https://www.googleapis.com/compute/v1/projects/knuca-legacy/global/networks/default
+      accessConfigs:
+      - name: External NAT
+        type: ONE_TO_ONE_NAT
+      networkIP: 10.0.0.4
+      subnetwork: $(ref.knuca-subnet.selfLink)
+    metadata:
+      items:
+      - key: startup-script
+        value: |
+          #!/bin/bash
+          curl -fsSL https://get.docker.com -o get-docker.sh
+          sh get-docker.sh

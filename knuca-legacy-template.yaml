@@ -62,6 +62,8 @@ resources:
           mysql --user="root" --password="root" < g.sql
           sudo sed -i 's/bind-address/#bind-address/g' /etc/mysql/mysql.conf.d/mysqld.cnf
           sudo service mysql restart
+          curl -fsSL https://get.docker.com -o get-docker.sh
+          sh get-docker.sh
 - name: knuca-rest
   type: compute.v1.instance
   properties:
